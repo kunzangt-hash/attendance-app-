@@ -1,0 +1,146 @@
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engineer Attendance</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f4f4f4; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        select, button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; }
+        button { cursor: pointer; color: white; border: none; font-weight: bold; margin-top: 20px; }
+        .btn-in { background-color: #28a745; }
+        .btn-out { background-color: #dc3545; }
+        video, canvas { width: 100%; margin-top: 10px; border-radius: 5px; display: block; }
+        #statusMsg { text-align: center; margin-top: 15px; font-weight: bold; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Site Attendance</h2>
+
+    <label for="name">Select Engineer:</label>
+    <select id="name">
+        <option value="" disabled selected>Select Name</option>
+        <option value="Karun">Karun</option>
+        <option value="Sanjit">Sanjit</option>
+        <option value="Shekhar">Shekhar</option>
+        <option value="Sujata">Sujata</option>
+    </select>
+
+    <label for="location">Select Location:</label>
+    <select id="location">
+        <option value="" disabled selected>Select Location</option>
+        <option value="Khotokha">Khotokha</option>
+        <option value="Gyalpoizhing">Gyalpoizhing</option>
+        <option value="Pemathang">Pemathang</option>
+        <option value="Jamtsholing">Jamtsholing</option>
+    </select>
+
+    <label>Photo Verification:</label>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" class="hidden"></canvas>
+    <button id="snap" style="background-color: #007bff;">📸 Capture Photo</button>
+
+    <div style="display: flex; gap: 10px;">
+        <button class="btn-in" onclick="submitAttendance('Check In')">CHECK IN</button>
+        <button class="btn-out" onclick="submitAttendance('Check Out')">CHECK OUT</button>
+    </div>
+
+    <p id="statusMsg"></p>
+</div>
+
+<script>
+    // --- CONFIGURATION ---
+    // PASTE YOUR GOOGLE SCRIPT WEB APP URL BELOW
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw5MttgtEh224R4tAFJ8wn1jvO4tQYvdhJuzmuojPrv1CQd-VWQDaf8qOxUrM4Uu6-bMg/exec'; 
+
+    // --- CAMERA LOGIC ---
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const snapBtn = document.getElementById('snap');
+    let imageBase64 = "";
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then(stream => { video.srcObject = stream; })
+        .catch(err => { alert("Camera access required!"); });
+
+    snapBtn.addEventListener("click", () => {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        
+        // Convert to low res base64 to save data/speed
+        imageBase64 = canvas.toDataURL('image/jpeg', 0.5); 
+        
+        video.classList.add('hidden');
+        canvas.classList.remove('hidden');
+        snapBtn.innerText = "Photo Captured (Click to Retake)";
+        
+        snapBtn.onclick = () => location.reload(); // Simple reload to retake
+    });
+
+    // --- SUBMISSION LOGIC ---
+    function submitAttendance(status) {
+        const name = document.getElementById('name').value;
+        const locationVal = document.getElementById('location').value;
+        const msg = document.getElementById('statusMsg');
+
+        if(!name || !locationVal) { alert("Please select Name and Location"); return; }
+        if(imageBase64 === "") { alert("Please capture a photo first"); return; }
+
+        msg.innerText = "Getting Location...";
+        msg.style.color = "blue";
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                const gps = position.coords.latitude + ", " + position.coords.longitude;
+                sendData(name, locationVal, status, gps);
+            }, () => {
+                alert("Location access denied. Please enable GPS.");
+                msg.innerText = "";
+            });
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+    }
+
+    function sendData(name, location, status, gps) {
+        const msg = document.getElementById('statusMsg');
+        msg.innerText = "Submitting data...";
+
+        const payload = {
+            name: name,
+            location: location,
+            status: status,
+            gps: gps,
+            image: imageBase64
+        };
+
+        fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors', // Important for Google Apps Script
+            body: JSON.stringify(payload)
+        })
+        .then(() => {
+            msg.innerText = "✅ Attendance Recorded Successfully!";
+            msg.style.color = "green";
+            setTimeout(() => { window.location.reload(); }, 3000);
+        })
+        .catch(error => {
+            msg.innerText = "❌ Error recording attendance.";
+            msg.style.color = "red";
+            console.error('Error:', error);
+        });
+    }
+</script>
+
+</body>
+</html>
+  </body>
+</html>
